@@ -1,0 +1,177 @@
+# Security workflow for Nodea MVP 2.1
+# Runs security checks on every push and pull request
+
+name: Security Checks
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    # Run security checks daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run npm audit
+      run: npm audit --audit-level=moderate
+      
+    - name: Check for outdated packages
+      run: npm outdated || true
+      
+    - name: Verify lockfile integrity
+      run: |
+        npm ci --dry-run
+        echo "Lockfile integrity verified"
+        
+    - name: Check for known vulnerabilities
+      run: |
+        if npm audit --audit-level=high; then
+          echo "No high-severity vulnerabilities found"
+        else
+          echo "High-severity vulnerabilities detected!"
+          exit 1
+        fi
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Dependency Review
+      uses: actions/dependency-review-action@v4
+      with:
+        fail-on-severity: moderate
+        allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC
+        deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0
+
+  build-security:
+    name: Build Security Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build application
+      run: npm run build
+      
+    - name: Check build artifacts
+      run: |
+        if [ -d "dist" ]; then
+          echo "Build artifacts found in dist/"
+          ls -la dist/
+        else
+          echo "No build artifacts found"
+          exit 1
+        fi
+
+  security-headers:
+    name: Security Headers Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build application
+      run: npm run build
+      
+    - name: Check security headers in HTML
+      run: |
+        if [ -f "dist/index.html" ]; then
+          echo "Checking security headers in index.html..."
+          if grep -q "Content-Security-Policy" dist/index.html; then
+            echo "✅ CSP header found"
+          else
+            echo "❌ CSP header missing"
+            exit 1
+          fi
+          
+          if grep -q "X-Frame-Options" dist/index.html; then
+            echo "✅ X-Frame-Options header found"
+          else
+            echo "❌ X-Frame-Options header missing"
+            exit 1
+          fi
+          
+          if grep -q "X-Content-Type-Options" dist/index.html; then
+            echo "✅ X-Content-Type-Options header found"
+          else
+            echo "❌ X-Content-Type-Options header missing"
+            exit 1
+          fi
+        else
+          echo "No index.html found in dist/"
+          exit 1
+        fi
+
+  license-check:
+    name: License Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Check package licenses
+      run: |
+        echo "Checking package licenses..."
+        npm list --depth=0 --json | jq -r '.dependencies | to_entries[] | "\(.key): \(.value.license // "unknown")"' > licenses.txt
+        cat licenses.txt
+        
+        # Check for problematic licenses
+        if grep -E "(GPL|AGPL|Copyleft)" licenses.txt; then
+          echo "❌ Problematic licenses detected!"
+          exit 1
+        else
+          echo "✅ No problematic licenses found"
+        fi

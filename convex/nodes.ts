@@ -3,14 +3,20 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { api } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
+import { requireAuth } from "./security";
+import { 
+  validateNodeContent, 
+  validatePosition, 
+  validateModelName, 
+  validateProviderName,
+  validateTemperature,
+  validateMaxTokens 
+} from "./validation";
 
 export const listNodesByBoard = query({
   args: { boardId: v.id("boards") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
+    const userId = await requireAuth(ctx);
 
     // Check board access
     const board = await ctx.db.get(args.boardId);
@@ -60,7 +66,7 @@ export const createNode = mutation({
     })),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuth(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -81,6 +87,7 @@ export const createNode = mutation({
       collapsed: args.collapsed ?? false,
       meta: args.meta ?? {},
       createdBy: userId,
+      createdAt: Date.now(),
       updatedAt: Date.now(),
     });
 
@@ -117,7 +124,7 @@ export const updateNode = mutation({
     })),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuth(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -155,16 +162,19 @@ export const generateFromMessage = mutation({
     maxTokens: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<Id<"nodes">> => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
+    const userId = await requireAuth(ctx);
 
     // Get the message node
     const messageNode = await ctx.db.get(args.messageNodeId);
     if (!messageNode || (messageNode.type !== "message" && messageNode.type !== "prompt")) {
       throw new Error("Message node not found");
     }
+
+    // Validate and sanitize inputs
+    const validatedProvider = args.provider ? validateProviderName(args.provider) : "openai";
+    const validatedModel = args.model ? validateModelName(args.model) : "gpt-4o";
+    const validatedTemperature = validateTemperature(args.temperature);
+    const validatedMaxTokens = validateMaxTokens(args.maxTokens);
 
     // Check board access
     const board = await ctx.db.get(args.boardId);
@@ -198,10 +208,10 @@ export const generateFromMessage = mutation({
       }
     }
 
-    // Add the main message
+    // Add the main message (validate content)
     messages.push({
       role: "user",
-      content: messageNode.content
+      content: validateNodeContent(messageNode.content)
     });
 
     // Create a placeholder response node that will be updated by the action
@@ -216,27 +226,24 @@ export const generateFromMessage = mutation({
       },
       collapsed: false,
       meta: {
-        model: args.model || "gpt-4o",
-        provider: args.provider || "openai",
+        model: validatedModel,
+        provider: validatedProvider,
       },
       createdBy: userId,
+      createdAt: Date.now(),
       updatedAt: Date.now(),
     });
 
-    // Schedule the LLM completion action to run after this mutation
-    await ctx.scheduler.runAfter(0, api.llm.completeStream, {
+    // Schedule the secure LLM completion action to run after this mutation
+    await ctx.scheduler.runAfter(0, api.llmSecure.completeStream, {
       boardId: args.boardId,
       nodeId: args.messageNodeId,
       responseNodeId: responseNodeId,
-      userId: userId,
-      boardData: {
-        defaultApiKeyId: board.defaultApiKeyId,
-      },
       messages,
-      provider: args.provider,
-      model: args.model,
-      temperature: args.temperature,
-      maxTokens: args.maxTokens,
+      provider: validatedProvider,
+      model: validatedModel,
+      temperature: validatedTemperature,
+      maxTokens: validatedMaxTokens,
     });
 
     // Create an edge from message to response
@@ -245,6 +252,9 @@ export const generateFromMessage = mutation({
       srcNodeId: args.messageNodeId,
       dstNodeId: responseNodeId,
       kind: "lineage",
+      createdBy: userId,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     });
 
     return responseNodeId;
@@ -255,7 +265,7 @@ export const generateFromMessage = mutation({
 export const migratePromptToMessage = mutation({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuth(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -266,7 +276,7 @@ export const migratePromptToMessage = mutation({
       .filter((q) => q.eq(q.field("type"), "prompt"))
       .collect();
 
-    console.log(`Found ${promptNodes.length} prompt nodes to migrate`);
+    // Security: No logging of sensitive data
 
     // Update each prompt node to message
     for (const node of promptNodes) {
@@ -274,7 +284,7 @@ export const migratePromptToMessage = mutation({
         type: "message",
         updatedAt: Date.now(),
       });
-      console.log(`Migrated node ${node._id} from prompt to message`);
+      // Security: No logging of sensitive data
     }
 
     return { migrated: promptNodes.length };
@@ -338,7 +348,7 @@ export const deleteNode = mutation({
     deleteDescendants: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuth(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -415,7 +425,7 @@ export const autoTitleNode = mutation({
     nodeId: v.id("nodes"),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuth(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }

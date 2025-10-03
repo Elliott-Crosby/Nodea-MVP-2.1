@@ -24,6 +24,7 @@ export const recordUsage = internalMutation({
       outputTokens: args.outputTokens,
       costEstimate: args.costEstimate,
       status: args.status,
+      createdAt: Date.now(),
     });
   },
 });

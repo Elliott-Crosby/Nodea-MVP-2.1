@@ -1,42 +1,29 @@
 # Web Search Setup Guide
 
-## Serper API Setup
+## OpenAI Web Search
 
-To enable web search functionality, you need to set up a Serper API key:
+Nodea now uses OpenAI's native web search functionality, which is built directly into the GPT models.
 
-### 1. Get Serper API Key
-1. Go to [serper.dev](https://serper.dev)
-2. Sign up for a free account
-3. Get your API key from the dashboard
-
-### 2. Add API Key to Environment
-Add your Serper API key to your `.env.local` file:
+### 1. OpenAI API Key
+Make sure you have your OpenAI API key set in your Convex environment:
 
 ```bash
-SERPER_API_KEY=your_api_key_here
-```
-
-### 3. Deploy to Convex
-Make sure to add the environment variable to your Convex deployment:
-
-```bash
-npx convex env set SERPER_API_KEY your_api_key_here
+npx convex env set CONVEX_OPENAI_API_KEY your_openai_api_key_here
 ```
 
 ## How It Works
 
 1. **Automatic Detection**: The system detects when web search is needed based on message content
-2. **Function Calling**: GPT decides to call the `web_search` function when current information is needed
-3. **Google Search**: Uses Serper API to get real Google search results
-4. **Rich Results**: Includes organic results, answer boxes, and knowledge graph data
-5. **Seamless Integration**: Search results are fed back to GPT for comprehensive responses
+2. **Native Integration**: Uses OpenAI's built-in web search tool
+3. **Real-time Results**: Gets current information from the web
+4. **Seamless Integration**: Search results are automatically incorporated into responses
 
 ## Features
 
-- **Real-time Search**: Gets current information from Google
-- **Rich Data**: Includes titles, snippets, and source URLs
-- **Answer Boxes**: Direct answers when available
-- **Knowledge Graph**: Additional context from Google's knowledge base
+- **Real-time Search**: Gets current information from the web
+- **Native Integration**: Uses OpenAI's official web search tool
+- **Automatic Detection**: No need to explicitly request web search
+- **Citation Support**: Includes source URLs in responses
 - **Error Handling**: Graceful fallback if search fails
 
 ## Testing
@@ -48,4 +35,10 @@ Try asking questions like:
 - "Search for information about climate change"
 
 The system will automatically use web search when it detects the need for current information!
+
+## Security
+
+- All web search requests are handled server-side only
+- Rate limiting prevents abuse
+- User authentication required for all operations
 

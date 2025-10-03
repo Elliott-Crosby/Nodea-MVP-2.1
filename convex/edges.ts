@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { requireAuth } from "./security";
 
 export const createEdge = mutation({
   args: {
@@ -11,7 +12,7 @@ export const createEdge = mutation({
     label: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuth(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -36,6 +37,9 @@ export const createEdge = mutation({
       dstNodeId: args.dstNodeId,
       kind: args.kind,
       label: args.label,
+      createdBy: userId,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     });
 
     return edgeId;
@@ -45,7 +49,7 @@ export const createEdge = mutation({
 export const deleteEdge = mutation({
   args: { edgeId: v.id("edges") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuth(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -68,7 +72,7 @@ export const deleteEdge = mutation({
 export const listEdgesByBoard = query({
   args: { boardId: v.id("boards") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuth(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }

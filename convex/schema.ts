@@ -11,8 +11,23 @@ const applicationTables = {
     settingsJson: v.optional(v.string()),
     defaultApiKeyId: v.optional(v.id("apiKeys")),
     isPublic: v.boolean(),
+    // ACL fields for least-privilege access
+    permissions: v.optional(v.object({
+      canView: v.array(v.id("users")),
+      canEdit: v.array(v.id("users")),
+      canAdmin: v.array(v.id("users")),
+    })),
+    // Security metadata
+    createdBy: v.id("users"),
+    createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_owner", ["ownerUserId"]),
+    // Audit trail
+    lastAccessedAt: v.optional(v.number()),
+    lastAccessedBy: v.optional(v.id("users")),
+  })
+    .index("by_owner", ["ownerUserId"])
+    .index("by_created", ["createdBy"])
+    .index("by_public", ["isPublic"]),
 
   nodes: defineTable({
     boardId: v.id("boards"),
@@ -43,9 +58,16 @@ const applicationTables = {
         at: v.number(),
       }))),
     }),
+    // Security metadata
     createdBy: v.id("users"),
+    createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_board", ["boardId"]),
+    // Audit trail
+    lastAccessedAt: v.optional(v.number()),
+    lastAccessedBy: v.optional(v.id("users")),
+  })
+    .index("by_board", ["boardId"])
+    .index("by_created", ["createdBy"]),
 
   edges: defineTable({
     boardId: v.id("boards"),
@@ -53,28 +75,49 @@ const applicationTables = {
     dstNodeId: v.id("nodes"),
     kind: v.union(v.literal("lineage"), v.literal("reference")),
     label: v.optional(v.string()),
-  }).index("by_board", ["boardId"])
+    // Security metadata
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_board", ["boardId"])
     .index("by_src", ["srcNodeId"])
-    .index("by_dst", ["dstNodeId"]),
+    .index("by_dst", ["dstNodeId"])
+    .index("by_created", ["createdBy"]),
 
   tags: defineTable({
     boardId: v.id("boards"),
     name: v.string(),
     color: v.string(),
-  }).index("by_board", ["boardId"]),
+    // Security metadata
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_board", ["boardId"])
+    .index("by_created", ["createdBy"]),
 
   nodeTags: defineTable({
     nodeId: v.id("nodes"),
     tagId: v.id("tags"),
-  }).index("by_node", ["nodeId"])
-    .index("by_tag", ["tagId"]),
+    // Security metadata
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_node", ["nodeId"])
+    .index("by_tag", ["tagId"])
+    .index("by_created", ["createdBy"]),
 
   snapshots: defineTable({
     boardId: v.id("boards"),
     label: v.string(),
     graphJson: v.string(),
     createdBy: v.id("users"),
-  }).index("by_board", ["boardId"]),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_board", ["boardId"])
+    .index("by_created", ["createdBy"]),
 
   apiKeys: defineTable({
     ownerUserId: v.id("users"),
@@ -83,8 +126,17 @@ const applicationTables = {
     last4: v.string(),
     encryptedKey: v.string(),
     status: v.union(v.literal("active"), v.literal("revoked")),
+    // Security metadata
+    createdBy: v.id("users"),
+    createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_owner", ["ownerUserId"]),
+    // Audit trail
+    lastUsedAt: v.optional(v.number()),
+    lastUsedBy: v.optional(v.id("users")),
+  })
+    .index("by_owner", ["ownerUserId"])
+    .index("by_created", ["createdBy"])
+    .index("by_status", ["status"]),
 
   usageEvents: defineTable({
     userId: v.id("users"),
@@ -96,16 +148,53 @@ const applicationTables = {
     outputTokens: v.number(),
     costEstimate: v.number(),
     status: v.string(),
-  }).index("by_user", ["userId"])
-    .index("by_board", ["boardId"]),
+    // Security metadata
+    createdAt: v.number(),
+    sessionId: v.optional(v.string()),
+    ipAddress: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_board", ["boardId"])
+    .index("by_created", ["createdAt"]),
 
   sharingTokens: defineTable({
     boardId: v.id("boards"),
     token: v.string(),
     access: v.union(v.literal("view"), v.literal("comment")),
     expiresAt: v.number(),
-  }).index("by_board", ["boardId"])
-    .index("by_token", ["token"]),
+    // Security metadata
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    // Audit trail
+    lastAccessedAt: v.optional(v.number()),
+    lastAccessedBy: v.optional(v.id("users")),
+    accessCount: v.number(),
+    maxAccesses: v.optional(v.number()),
+  })
+    .index("by_board", ["boardId"])
+    .index("by_token", ["token"])
+    .index("by_created", ["createdBy"])
+    .index("by_expires", ["expiresAt"]),
+
+  // Audit log for security monitoring
+  auditLog: defineTable({
+    userId: v.optional(v.id("users")),
+    action: v.string(),
+    resourceType: v.string(),
+    resourceId: v.optional(v.string()),
+    success: v.boolean(),
+    details: v.optional(v.string()),
+    ipAddress: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+    sessionId: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_action", ["action"])
+    .index("by_resource", ["resourceType", "resourceId"])
+    .index("by_created", ["createdAt"])
+    .index("by_success", ["success"]),
 };
 
 export default defineSchema({

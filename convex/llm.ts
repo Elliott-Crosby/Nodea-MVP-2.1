@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { api, internal } from "./_generated/api";
 import { decryptApiKey } from "./keys";
+import { requireAuth, checkRateLimit } from "./security";
 
 // Helper function to determine if web search should be enabled
 function shouldEnableWebSearch(messages: any[]): boolean {
@@ -89,9 +90,7 @@ export const complete = action({
     let inputTokens = 0;
     let outputTokens = 0;
 
-    console.log('Using model:', model, '->', enableWebSearch ? 'gpt-4o-mini' : 'gpt-4o-mini');
-    console.log('Web search enabled:', enableWebSearch);
-    console.log('Messages being sent to AI:', JSON.stringify(args.messages, null, 2));
+    // Security: No logging of sensitive data (messages, API keys, etc.)
 
     try {
       if (provider === "openai") {
@@ -205,8 +204,7 @@ export const completeStream = action({
     let inputTokens = 0;
     let outputTokens = 0;
 
-    console.log('Using model:', model, '->', enableWebSearch ? 'gpt-4o-mini' : 'gpt-4o-mini');
-    console.log('Web search enabled:', enableWebSearch);
+    // Security: No logging of sensitive data (messages, API keys, etc.)
 
     try {
       if (provider === "openai") {
@@ -229,7 +227,8 @@ export const completeStream = action({
                 tokens: { input: 0, output: 0 }, // Temporary tokens during streaming
               });
             } catch (error) {
-              console.error('Error updating response node during streaming:', error);
+              // Security: Log error without sensitive data
+              console.error('Error updating response node during streaming');
               // Continue streaming even if node update fails
             }
           }
@@ -261,7 +260,8 @@ export const completeStream = action({
             tokens: { input: inputTokens, output: outputTokens },
           });
         } catch (error) {
-          console.error('Error updating response node at end:', error);
+          // Security: Log error without sensitive data
+          console.error('Error updating response node at end');
           // Continue without failing the entire operation
         }
       }

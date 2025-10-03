@@ -1,11 +1,12 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { requireAuth } from "./security";
 
 export const exportMarkdown = query({
   args: { boardId: v.id("boards") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuth(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -71,7 +72,7 @@ export const exportMarkdown = query({
 export const exportJson = query({
   args: { boardId: v.id("boards") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuth(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -175,7 +176,7 @@ function generateNodeMarkdown(
 export const clearBoard = mutation({
   args: { boardId: v.id("boards") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuth(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -187,7 +188,7 @@ export const clearBoard = mutation({
         .withIndex("by_board", (q) => q.eq("boardId", args.boardId))
         .collect();
       
-      console.log(`Found ${nodes.length} nodes to delete`);
+      // Security: No logging of sensitive data
       for (const node of nodes) {
         await ctx.db.delete(node._id);
       }
@@ -198,7 +199,7 @@ export const clearBoard = mutation({
         .withIndex("by_board", (q) => q.eq("boardId", args.boardId))
         .collect();
       
-      console.log(`Found ${edges.length} edges to delete`);
+      // Security: No logging of sensitive data
       for (const edge of edges) {
         await ctx.db.delete(edge._id);
       }
@@ -209,7 +210,7 @@ export const clearBoard = mutation({
         .withIndex("by_board", (q) => q.eq("boardId", args.boardId))
         .collect();
       
-      console.log(`Found ${tags.length} tags to delete`);
+      // Security: No logging of sensitive data
       for (const tag of tags) {
         await ctx.db.delete(tag._id);
       }
@@ -220,15 +221,16 @@ export const clearBoard = mutation({
         nodes.some(node => node._id === nt.nodeId)
       );
       
-      console.log(`Found ${boardNodeTags.length} node tags to delete`);
+      // Security: No logging of sensitive data
       for (const nodeTag of boardNodeTags) {
         await ctx.db.delete(nodeTag._id);
       }
 
-      console.log("Board cleared successfully");
+      // Board cleared successfully
       return { success: true, deleted: { nodes: nodes.length, edges: edges.length, tags: tags.length, nodeTags: boardNodeTags.length } };
     } catch (error) {
-      console.error("Error clearing board:", error);
+      // Security: Log error without sensitive data
+      console.error("Error clearing board");
       throw new Error(`Failed to clear board: ${error instanceof Error ? error.message : String(error)}`);
     }
   },

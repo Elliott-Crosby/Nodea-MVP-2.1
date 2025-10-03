@@ -3,7 +3,7 @@
 This is a project built with [Chef](https://chef.convex.dev) using [Convex](https://convex.dev) as its backend.
  You can find docs about Chef with useful information like how to deploy to production [here](https://docs.convex.dev/chef).
   
-This project is connected to the Convex deployment named [`tacit-wombat-905`](https://dashboard.convex.dev/d/tacit-wombat-905).
+This project is connected to a Convex deployment for secure backend services.
   
 ## Project structure
   
@@ -15,7 +15,7 @@ The backend code is in the `convex` directory.
 
 ## App authentication
 
-Chef apps use [Convex Auth](https://auth.convex.dev/) with Anonymous auth for easy sign in. You may wish to change this before deploying your app.
+This app uses [Convex Auth](https://auth.convex.dev/) with secure password-based authentication. All server functions require authenticated users.
 
 ## Developing and deploying your app
 

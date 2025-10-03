@@ -1,6 +1,8 @@
 import { mutation, query, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { requireAuth } from "./security";
+import { validateApiKeyNickname, validateProviderName } from "./validation";
 
 export const addApiKey = mutation({
   args: {
@@ -9,13 +11,14 @@ export const addApiKey = mutation({
     secret: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
+    const userId = await requireAuth(ctx);
+
+    // Validate and sanitize inputs
+    const validatedNickname = validateApiKeyNickname(args.nickname);
+    const validatedProvider = validateProviderName(args.provider);
 
     // Validate the API key with a test call
-    const isValid = await validateApiKey(args.provider, args.secret);
+    const isValid = await validateApiKey(validatedProvider, args.secret);
     if (!isValid) {
       throw new Error("Invalid API key");
     }
@@ -26,11 +29,13 @@ export const addApiKey = mutation({
 
     const keyId = await ctx.db.insert("apiKeys", {
       ownerUserId: userId,
-      provider: args.provider,
-      nickname: args.nickname,
+      provider: validatedProvider as "openai" | "anthropic" | "google",
+      nickname: validatedNickname,
       last4,
       encryptedKey,
       status: "active",
+      createdBy: userId,
+      createdAt: Date.now(),
       updatedAt: Date.now(),
     });
 
@@ -41,7 +46,7 @@ export const addApiKey = mutation({
 export const listApiKeys = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuth(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -64,10 +69,27 @@ export const listApiKeys = query({
   },
 });
 
+export const getEncryptedKey = query({
+  args: { keyId: v.id("apiKeys") },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const key = await ctx.db.get(args.keyId);
+    if (!key || key.ownerUserId !== userId) {
+      throw new Error("API key not found or access denied");
+    }
+
+    return { encryptedKey: key.encryptedKey };
+  },
+});
+
 export const revokeApiKey = mutation({
   args: { keyId: v.id("apiKeys") },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await requireAuth(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
